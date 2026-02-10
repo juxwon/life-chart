@@ -1,0 +1,1339 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Life Chart Editor</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+  <style>
+    :root {
+      --bg: #ffffff;
+      --text: #1d1d1f;
+      --muted: #86868b;
+      --accent: #007aff;
+      --line: #2c3e50;
+      --divider: #d2d2d7;
+      --input-bg: #f5f5f7;
+      --danger: #ff3b30;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+    }
+    .page {
+      display: none;
+      width: 100%;
+      min-height: 100vh;
+      padding: 20px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .page.active {
+      display: block;
+    }
+    .page.anim-in-right { animation: slideInRight 0.3s ease-out; }
+    .page.anim-in-left { animation: slideInLeft 0.3s ease-out; }
+    .page.anim-out-left { animation: slideOutLeft 0.3s ease-out; }
+    .page.anim-out-right { animation: slideOutRight 0.3s ease-out; }
+    .layout {
+      display: grid;
+      grid-template-columns: 40% 60%;
+      gap: 24px;
+      align-items: start;
+    }
+    h1 {
+      margin: 0 0 16px 0;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .section {
+      margin-bottom: 24px;
+    }
+    .section-title {
+      margin: 0 0 12px 0;
+      font-size: 17px;
+      font-weight: 600;
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+    }
+
+    /* 버튼 스타일 */
+    .btn {
+      height: 44px;
+      border: none;
+      border-radius: 10px;
+      padding: 0 14px;
+      font-size: 15px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: filter 0.15s ease, transform 0.08s ease;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+    }
+    .btn-primary:hover { filter: brightness(1.1); }
+    .btn-secondary {
+      background: var(--input-bg);
+      color: var(--text);
+    }
+
+    .row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    /* 입력 필드 */
+    label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin: 0 0 6px 2px;
+    }
+    .field {
+      width: 100%;
+      height: 44px;
+      border: 2px solid transparent;
+      border-radius: 10px;
+      background: var(--input-bg);
+      padding: 0 12px;
+      font-size: 17px;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+      color: var(--text);
+      transition: border-color 0.15s ease, background 0.15s ease;
+    }
+    .field::placeholder { color: var(--muted); }
+    .field:focus {
+      outline: none;
+      background: #fff;
+      border-color: var(--accent);
+    }
+    .field.error {
+      border-color: var(--danger);
+      background: #fff;
+    }
+    .error-text {
+      color: var(--danger);
+      font-size: 12px;
+      margin-top: 6px;
+    }
+
+    /* 이벤트 카드 */
+    .event-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .event-card {
+      background: #fff;
+      border: 1px solid var(--divider);
+      border-radius: 12px;
+      padding: 16px;
+      position: relative;
+      transition: background 0.15s ease;
+    }
+    .event-card:hover { background: var(--input-bg); }
+    .event-year {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: var(--text);
+    }
+    .event-score {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .event-label {
+      font-size: 13px;
+      color: var(--text);
+    }
+    .delete-btn {
+      position: absolute;
+      right: 12px;
+      top: 12px;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      font-size: 16px;
+      cursor: pointer;
+      transition: color 0.15s ease;
+    }
+    .delete-btn:hover { color: var(--danger); }
+
+    .empty-state {
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+      padding: 18px 0;
+    }
+
+    /* 차트 패널 */
+    .chart-panel {
+      background: #fff;
+      border: 1px solid var(--divider);
+      border-radius: 16px;
+      padding: 16px;
+      min-height: 340px;
+      position: relative;
+    }
+    .chart-wrap {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      min-height: 300px;
+    }
+    canvas {
+      width: 100% !important;
+      height: 100% !important;
+      display: block;
+    }
+    .chart-empty {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      color: var(--muted);
+      font-size: 14px;
+      pointer-events: none;
+      text-align: center;
+      padding: 20px;
+    }
+
+    /* 경고 메시지 */
+    .warning {
+      color: #b36200;
+      font-size: 12px;
+      margin-top: 8px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px 8px 20px;
+      max-width: 1200px;
+      margin: 0 auto;
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+    }
+    .gear {
+      font-size: 16px;
+      color: var(--muted);
+    }
+
+    .nav-btn {
+      width: 100px;
+      height: 56px;
+      border: 1px solid var(--divider);
+      background: transparent;
+      border-radius: 12px;
+      color: var(--accent);
+      font-size: 15px;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      cursor: pointer;
+      transition: transform 0.2s ease-out, background 0.2s ease-out, border-color 0.2s ease-out;
+    }
+    .nav-btn:hover {
+      background: var(--input-bg);
+      border-color: var(--accent);
+      transform: scale(1.02);
+    }
+    .nav-btn:active { transform: scale(0.98); }
+    .nav-yearly {
+      position: absolute;
+      right: 20px;
+      bottom: 20px;
+    }
+    .nav-daily {
+      position: absolute;
+      left: 20px;
+      top: 20px;
+    }
+
+    /* Daily styles */
+    .slider-row {
+      display: grid;
+      grid-template-columns: 1fr 64px;
+      gap: 12px;
+      align-items: center;
+      padding: 10px 0;
+      border-top: 1px solid var(--divider);
+    }
+    .slider-row:first-child { border-top: none; }
+    .slider-label {
+      font-size: 14px;
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+    .range {
+      width: 100%;
+      appearance: none;
+      height: 4px;
+      background: var(--divider);
+      border-radius: 999px;
+      outline: none;
+    }
+    .range::-webkit-slider-thumb {
+      appearance: none;
+      width: 20px;
+      height: 20px;
+      background: var(--accent);
+      border-radius: 50%;
+      cursor: pointer;
+      border: none;
+    }
+    .range::-moz-range-thumb {
+      width: 20px;
+      height: 20px;
+      background: var(--accent);
+      border-radius: 50%;
+      cursor: pointer;
+      border: none;
+    }
+    .range-value {
+      text-align: right;
+      font-family: "SF Mono", "Monaco", monospace;
+      font-size: 20px;
+      color: var(--text);
+    }
+    .weights-panel {
+      border: 1px solid var(--divider);
+      border-radius: 12px;
+      padding: 12px;
+    }
+    .weights-row {
+      display: grid;
+      grid-template-columns: 1fr 80px;
+      gap: 10px;
+      align-items: center;
+      padding: 8px 0;
+    }
+    .weights-row + .weights-row { border-top: 1px solid var(--divider); }
+    .weights-sum {
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .score-box {
+      background: var(--input-bg);
+      border-radius: 16px;
+      padding: 24px;
+      text-align: center;
+    }
+    .score-number {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+      font-size: 48px;
+      font-weight: 700;
+      color: var(--text);
+      margin: 8px 0;
+    }
+    .score-note {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .daily-card {
+      background: #fff;
+      border: 1px solid var(--divider);
+      border-radius: 12px;
+      padding: 14px 16px;
+      position: relative;
+      transition: background 0.15s ease;
+      cursor: pointer;
+    }
+    .daily-card:hover { background: var(--input-bg); }
+    .daily-title {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    .daily-meta {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .daily-subs {
+      font-size: 13px;
+      color: var(--text);
+    }
+    .daily-delete {
+      position: absolute;
+      right: 10px;
+      top: 10px;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      font-size: 16px;
+      cursor: pointer;
+    }
+    .daily-delete:hover { color: var(--danger); }
+
+    @keyframes slideInRight {
+      from { opacity: 0; transform: translateX(20px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    @keyframes slideInLeft {
+      from { opacity: 0; transform: translateX(-20px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    @keyframes slideOutLeft {
+      from { opacity: 1; transform: translateX(0); }
+      to { opacity: 0; transform: translateX(-20px); }
+    }
+    @keyframes slideOutRight {
+      from { opacity: 1; transform: translateX(0); }
+      to { opacity: 0; transform: translateX(20px); }
+    }
+
+    @media (max-width: 768px) {
+      .layout { grid-template-columns: 1fr; }
+      .chart-panel { order: 2; }
+      .editor-panel { order: 1; }
+      .nav-yearly {
+        position: fixed;
+        right: 20px;
+        bottom: 20px;
+      }
+      .nav-daily {
+        position: fixed;
+        left: 20px;
+        top: 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div>Life Chart</div>
+    <div class="gear">⚙︎</div>
+  </div>
+
+  <div id="yearly-page" class="page active">
+    <div class="layout">
+      <!-- Left: Editor -->
+      <div class="editor-panel">
+        <h1>Your Life Chart</h1>
+
+        <div class="section">
+          <div class="section-title">Quick Start</div>
+          <div class="row">
+            <button class="btn btn-secondary" id="loadExampleBtn">Load Example</button>
+            <button class="btn btn-secondary" id="clearAllBtn">Clear All</button>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Add Event</div>
+          <div>
+            <label for="yearInput">Year</label>
+            <input class="field" id="yearInput" type="number" min="1900" max="2100" placeholder="2024" />
+
+            <div style="height:12px"></div>
+
+            <label for="scoreInput">Score (0-100)</label>
+            <input class="field" id="scoreInput" type="number" min="0" max="100" placeholder="75" />
+
+            <div style="height:12px"></div>
+
+            <label for="labelInput">What happened?</label>
+            <input class="field" id="labelInput" type="text" placeholder="Optional" />
+
+            <div style="height:12px"></div>
+
+            <button class="btn btn-primary" id="addEventBtn" style="width:100%">Add Event</button>
+
+            <div id="formError" class="error-text" style="display:none"></div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Your Events</div>
+          <div id="eventList" class="event-list"></div>
+          <div id="eventEmpty" class="empty-state" style="display:none">No events yet. Add your first milestone above.</div>
+          <div id="eventWarning" class="warning" style="display:none">20개 이상 이벤트가 있습니다. 가독성이 떨어질 수 있어요.</div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Export</div>
+          <div class="row">
+            <button class="btn btn-secondary" id="downloadDataBtn" style="flex:1">Download Data</button>
+            <button class="btn btn-secondary" id="uploadDataBtn" style="flex:1">Upload Data</button>
+          </div>
+          <div style="height:12px"></div>
+          <button class="btn btn-primary" id="downloadImgBtn" style="width:100%">Download Image</button>
+          <div id="autosaveStatus" class="warning" style="display:none; margin-top:10px; color:#86868b"></div>
+          <div id="storageWarning" class="warning" style="display:none; color:#ff3b30">localStorage를 사용할 수 없습니다.</div>
+        </div>
+      </div>
+
+      <!-- Right: Chart -->
+      <div class="chart-panel">
+        <div class="chart-wrap">
+          <canvas id="lifeChart" width="600" height="338" aria-label="Life chart"></canvas>
+          <div id="chartEmpty" class="chart-empty">Add events to see your chart</div>
+        </div>
+      </div>
+    </div>
+    <button id="to-daily-btn" class="nav-btn nav-yearly">
+      <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
+        <path d="M8 4l8 8-8 8" stroke="#007AFF" stroke-width="2" fill="none"/>
+      </svg>
+      <span>Daily</span>
+    </button>
+  </div>
+
+  <div id="daily-page" class="page">
+    <div class="layout">
+      <!-- Left: Daily Editor -->
+      <div class="editor-panel">
+        <h1>Daily Check-In</h1>
+
+        <div class="section">
+          <div class="section-title">Date</div>
+          <label for="dailyDate">Date</label>
+          <input class="field" id="dailyDate" type="date" />
+        </div>
+
+        <div class="section">
+          <div class="section-title">Daily Scores</div>
+          <div class="weights-panel">
+            <div class="slider-row" style="border-top:none">
+              <div>
+                <div class="slider-label">관계 (Relationships)</div>
+                <input class="range" id="relRange" type="range" min="0" max="100" value="75" />
+              </div>
+              <div class="range-value" id="relVal">75</div>
+            </div>
+            <div class="slider-row">
+              <div>
+                <div class="slider-label">비즈니스 (Business)</div>
+                <input class="range" id="busRange" type="range" min="0" max="100" value="60" />
+              </div>
+              <div class="range-value" id="busVal">60</div>
+            </div>
+            <div class="slider-row">
+              <div>
+                <div class="slider-label">건강 (Health)</div>
+                <input class="range" id="heaRange" type="range" min="0" max="100" value="80" />
+              </div>
+              <div class="range-value" id="heaVal">80</div>
+            </div>
+            <div class="slider-row">
+              <div>
+                <div class="slider-label">기분 (Mood)</div>
+                <input class="range" id="moodRange" type="range" min="0" max="100" value="70" />
+              </div>
+              <div class="range-value" id="moodVal">70</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <details id="weightsToggle" open>
+            <summary class="section-title" style="cursor:pointer">Weights (Optional)</summary>
+            <div class="weights-panel" id="weightsPanel">
+            <div class="weights-row">
+              <div>관계</div>
+              <div style="display:grid; gap:6px">
+                <input class="range" id="wRel" type="range" min="0" max="100" value="25" />
+                <div class="range-value" id="wRelVal">25%</div>
+              </div>
+            </div>
+            <div class="weights-row">
+              <div>비즈니스</div>
+              <div style="display:grid; gap:6px">
+                <input class="range" id="wBus" type="range" min="0" max="100" value="25" />
+                <div class="range-value" id="wBusVal">25%</div>
+              </div>
+            </div>
+            <div class="weights-row">
+              <div>건강</div>
+              <div style="display:grid; gap:6px">
+                <input class="range" id="wHea" type="range" min="0" max="100" value="25" />
+                <div class="range-value" id="wHeaVal">25%</div>
+              </div>
+            </div>
+            <div class="weights-row">
+              <div>기분</div>
+              <div style="display:grid; gap:6px">
+                <input class="range" id="wMood" type="range" min="0" max="100" value="25" />
+                <div class="range-value" id="wMoodVal">25%</div>
+              </div>
+            </div>
+            <div id="weightSum" class="weights-sum">합계: 100% ✓</div>
+            </div>
+          </details>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Today's Score</div>
+          <div class="score-box">
+            <div class="score-number" id="dailyTotal">71</div>
+            <div class="score-note">Calculated from your inputs</div>
+          </div>
+        </div>
+
+        <div class="section">
+          <button class="btn btn-primary" id="saveDailyBtn" style="width:100%">Save Check-In</button>
+          <div id="dailySaveMsg" class="warning" style="display:none; color:#1d1d1f">Saved! ✓</div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Recent Check-Ins</div>
+          <div id="dailyList" class="event-list"></div>
+          <div id="dailyEmpty" class="empty-state" style="display:none">No check-ins yet.</div>
+        </div>
+      </div>
+
+      <!-- Right: Daily Chart -->
+      <div class="chart-panel">
+        <div class="chart-wrap">
+          <canvas id="dailyChart" width="600" height="338" aria-label="Daily chart"></canvas>
+          <div id="dailyChartEmpty" class="chart-empty">Start checking in to see your daily trends</div>
+        </div>
+      </div>
+    </div>
+
+    <button id="to-yearly-btn" class="nav-btn nav-daily">
+      <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
+        <path d="M12 4l-8 8 8 8" stroke="#007AFF" stroke-width="2" fill="none"/>
+      </svg>
+      <span>Yearly</span>
+    </button>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script>
+    // 상태 관리
+    let events = [];
+    const STORAGE_KEY = "lifeChartData";
+    let lastSavedAt = null;
+
+    // DOM 참조
+    const yearInput = document.getElementById("yearInput");
+    const scoreInput = document.getElementById("scoreInput");
+    const labelInput = document.getElementById("labelInput");
+    const formError = document.getElementById("formError");
+    const eventList = document.getElementById("eventList");
+    const eventEmpty = document.getElementById("eventEmpty");
+    const eventWarning = document.getElementById("eventWarning");
+    const chartEmpty = document.getElementById("chartEmpty");
+    const autosaveStatus = document.getElementById("autosaveStatus");
+    const storageWarning = document.getElementById("storageWarning");
+
+    // Chart.js 초기화
+    const ctx = document.getElementById("lifeChart").getContext("2d");
+    const chart = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels: [],
+        datasets: [{
+          data: [],
+          borderColor: "#2c3e50",
+          borderWidth: 1.5,
+          tension: 0.3,
+          pointRadius: 5,
+          pointHoverRadius: 7,
+          pointBackgroundColor: "#2c3e50",
+          pointBorderWidth: 0,
+          fill: false
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: {
+          duration: 1200,
+          easing: "easeOutQuart"
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            enabled: true,
+            backgroundColor: "rgba(0,0,0,0.8)",
+            titleColor: "#ffffff",
+            bodyColor: "#ffffff",
+            cornerRadius: 6,
+            padding: { top: 8, right: 12, bottom: 8, left: 12 },
+            titleFont: { family: "SF Pro Text, -apple-system, sans-serif", size: 12, weight: "400" },
+            bodyFont: { family: "SF Pro Text, -apple-system, sans-serif", size: 12, weight: "400" },
+            displayColors: false,
+            callbacks: {
+              title(items) {
+                return String(items[0].label || "");
+              },
+              label(item) {
+                const raw = item.raw || {};
+                const label = raw.label || "";
+                return [label, `Score: ${raw.y}`].filter(Boolean);
+              }
+            }
+          }
+        },
+        interaction: { mode: "nearest", intersect: false },
+        scales: {
+          x: {
+            grid: { display: false },
+            border: { display: false },
+            ticks: {
+              color: "#86868b",
+              font: { family: "SF Mono, Monaco, monospace", size: 11, weight: "400" },
+              padding: 8
+            }
+          },
+          y: {
+            display: false,
+            min: 0,
+            max: 100,
+            grid: { display: false },
+            border: { display: false }
+          }
+        }
+      }
+    });
+
+    // 로컬 저장 불러오기
+    const storageAvailable = () => {
+      try {
+        const testKey = "__lc_test__";
+        localStorage.setItem(testKey, "1");
+        localStorage.removeItem(testKey);
+        return true;
+      } catch (e) {
+        return false;
+      }
+    };
+
+    const loadFromStorage = () => {
+      if (!storageAvailable()) {
+        storageWarning.style.display = "block";
+        return;
+      }
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed && Array.isArray(parsed.events)) {
+          events = parsed.events;
+          lastSavedAt = parsed.timestamp ? new Date(parsed.timestamp) : null;
+        }
+      } catch (e) {
+        // 저장 데이터가 깨졌으면 무시
+      }
+    };
+
+    // 로컬 저장
+    const saveToStorage = () => {
+      if (!storageAvailable()) {
+        storageWarning.style.display = "block";
+        return;
+      }
+      const payload = { events, timestamp: new Date().toISOString() };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      lastSavedAt = new Date(payload.timestamp);
+      updateAutosaveStatus();
+    };
+
+    // 정렬
+    const sortEvents = () => {
+      events.sort((a, b) => a.year - b.year);
+    };
+
+    // 렌더링
+    const renderList = () => {
+      eventList.innerHTML = "";
+      eventEmpty.style.display = events.length === 0 ? "block" : "none";
+      eventWarning.style.display = events.length >= 20 ? "block" : "none";
+
+      events.forEach((ev, idx) => {
+        const card = document.createElement("div");
+        card.className = "event-card";
+
+        const year = document.createElement("div");
+        year.className = "event-year";
+        year.textContent = String(ev.year);
+
+        const score = document.createElement("div");
+        score.className = "event-score";
+        score.textContent = `Score: ${ev.score}`;
+
+        const label = document.createElement("div");
+        label.className = "event-label";
+        label.textContent = ev.label || "";
+
+        const del = document.createElement("button");
+        del.className = "delete-btn";
+        del.textContent = "✕";
+        del.addEventListener("click", () => {
+          events.splice(idx, 1);
+          saveToStorage();
+          updateUI();
+        });
+
+        card.appendChild(year);
+        card.appendChild(score);
+        if (ev.label) card.appendChild(label);
+        card.appendChild(del);
+        eventList.appendChild(card);
+      });
+    };
+
+    const updateChart = () => {
+      const hasEnough = events.length >= 2;
+      chartEmpty.style.display = hasEnough ? "none" : "grid";
+
+      const labels = events.map(e => String(e.year));
+      const data = events.map(e => ({ x: String(e.year), y: e.score, label: e.label }));
+
+      chart.data.labels = labels;
+      chart.data.datasets[0].data = data;
+      chart.update("active");
+    };
+
+    const updateUI = () => {
+      sortEvents();
+      renderList();
+      updateChart();
+      updateAutosaveStatus();
+    };
+
+    const updateAutosaveStatus = () => {
+      if (!lastSavedAt) {
+        autosaveStatus.style.display = "none";
+        return;
+      }
+      const diffMs = Date.now() - lastSavedAt.getTime();
+      const diffMin = Math.max(0, Math.round(diffMs / 60000));
+      const text = diffMin === 0 ? "Auto-saved just now" : `Auto-saved ${diffMin}m ago`;
+      autosaveStatus.textContent = text;
+      autosaveStatus.style.display = "block";
+    };
+
+    // 입력 검증
+    const validateInputs = () => {
+      const year = Number(yearInput.value);
+      const score = Number(scoreInput.value);
+
+      let msg = "";
+      const invalidYear = !Number.isFinite(year) || year < 1900 || year > 2100;
+      const invalidScore = !Number.isFinite(score) || score < 0 || score > 100;
+
+      yearInput.classList.toggle("error", invalidYear);
+      scoreInput.classList.toggle("error", invalidScore);
+
+      if (invalidYear && invalidScore) msg = "년도와 점수를 올바르게 입력하세요.";
+      else if (invalidYear) msg = "년도는 1900~2100 사이여야 합니다.";
+      else if (invalidScore) msg = "점수는 0~100 사이여야 합니다.";
+
+      formError.textContent = msg;
+      formError.style.display = msg ? "block" : "none";
+
+      return !invalidYear && !invalidScore;
+    };
+
+    // 이벤트 추가
+    document.getElementById("addEventBtn").addEventListener("click", () => {
+      if (!validateInputs()) return;
+
+      const year = Number(yearInput.value);
+      const score = Number(scoreInput.value);
+      const label = labelInput.value.trim();
+
+      events.push({ year, score, label });
+      saveToStorage();
+      updateUI();
+
+      yearInput.value = "";
+      scoreInput.value = "";
+      labelInput.value = "";
+      formError.style.display = "none";
+      yearInput.classList.remove("error");
+      scoreInput.classList.remove("error");
+    });
+
+    // 예시 로드
+    document.getElementById("loadExampleBtn").addEventListener("click", () => {
+      events = [
+        { year: 2020, score: 50, label: "Started my journey" },
+        { year: 2022, score: 32, label: "Company failed" },
+        { year: 2024, score: 70, label: "New beginning" },
+        { year: 2026, score: 85, label: "Promoted to lead" }
+      ];
+      saveToStorage();
+      updateUI();
+    });
+
+    // 모두 삭제
+    document.getElementById("clearAllBtn").addEventListener("click", () => {
+      events = [];
+      if (storageAvailable()) localStorage.removeItem(STORAGE_KEY);
+      lastSavedAt = null;
+      updateUI();
+    });
+
+    // 이미지 다운로드 (2x)
+    const getDateStamp = () => new Date().toISOString().slice(0, 10);
+
+    document.getElementById("downloadImgBtn").addEventListener("click", () => {
+      const canvas = chart.canvas;
+      const tmp = document.createElement("canvas");
+      const tctx = tmp.getContext("2d");
+
+      tmp.width = canvas.width * 2;
+      tmp.height = canvas.height * 2;
+      tctx.scale(2, 2);
+      tctx.drawImage(canvas, 0, 0);
+
+      const link = document.createElement("a");
+      link.download = `my-life-chart-${getDateStamp()}.png`;
+      link.href = tmp.toDataURL("image/png");
+      link.click();
+    });
+
+    // 데이터 다운로드
+    document.getElementById("downloadDataBtn").addEventListener("click", () => {
+      const payload = {
+        version: "1.0",
+        exportDate: new Date().toISOString(),
+        events
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+      const link = document.createElement("a");
+      link.download = `my-life-chart-${getDateStamp()}.json`;
+      link.href = URL.createObjectURL(blob);
+      link.click();
+      URL.revokeObjectURL(link.href);
+    });
+
+    // 데이터 업로드
+    const fileInput = document.createElement("input");
+    fileInput.type = "file";
+    fileInput.accept = "application/json";
+
+    document.getElementById("uploadDataBtn").addEventListener("click", () => {
+      fileInput.value = "";
+      fileInput.click();
+    });
+
+    fileInput.addEventListener("change", async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+
+      try {
+        const text = await file.text();
+        const parsed = JSON.parse(text);
+        if (!parsed || !Array.isArray(parsed.events)) {
+          alert("잘못된 파일 형식입니다. events 배열이 필요합니다.");
+          return;
+        }
+        const normalized = parsed.events.map(ev => ({
+          year: Number(ev.year),
+          score: Number(ev.score),
+          label: (ev.label || "").toString()
+        }));
+        const invalid = normalized.some(ev =>
+          !Number.isFinite(ev.year) || ev.year < 1900 || ev.year > 2100 ||
+          !Number.isFinite(ev.score) || ev.score < 0 || ev.score > 100
+        );
+        if (invalid) {
+          alert("이벤트 데이터가 유효하지 않습니다. 년도/점수를 확인하세요.");
+          return;
+        }
+
+        if (events.length > 0) {
+          const ok = confirm("기존 데이터를 덮어쓰시겠습니까?");
+          if (!ok) return;
+        }
+
+        events = normalized;
+        saveToStorage();
+        updateUI();
+      } catch (err) {
+        alert("파일을 읽는 중 오류가 발생했습니다.");
+      }
+    });
+
+    // 초기 상태
+    loadFromStorage();
+    updateUI();
+    setInterval(updateAutosaveStatus, 60000);
+  </script>
+
+  <script>
+    // 페이지 전환 로직 (연간/일간)
+    const switchPage = (fromId, toId, direction) => {
+      const from = document.getElementById(fromId);
+      const to = document.getElementById(toId);
+      if (!from || !to) return;
+
+      from.classList.remove("anim-in-right", "anim-in-left");
+      from.classList.add(direction === "left" ? "anim-out-left" : "anim-out-right");
+
+      to.classList.remove("anim-out-left", "anim-out-right");
+      to.classList.add("active", direction === "left" ? "anim-in-right" : "anim-in-left");
+
+      // 애니메이션 종료 후 정리
+      setTimeout(() => {
+        from.classList.remove("active");
+        from.classList.remove("anim-out-left", "anim-out-right");
+        to.classList.remove("anim-in-right", "anim-in-left");
+      }, 320);
+    };
+
+    document.getElementById("to-daily-btn").addEventListener("click", () => {
+      switchPage("yearly-page", "daily-page", "left");
+    });
+    document.getElementById("to-yearly-btn").addEventListener("click", () => {
+      switchPage("daily-page", "yearly-page", "right");
+    });
+
+    // ===== Daily Check-In =====
+    const DAILY_KEY = "dailyCheckIns";
+    let dailyData = {};
+
+    const dailyDate = document.getElementById("dailyDate");
+    const dailyTotal = document.getElementById("dailyTotal");
+    const dailySaveMsg = document.getElementById("dailySaveMsg");
+    const dailyList = document.getElementById("dailyList");
+    const dailyEmpty = document.getElementById("dailyEmpty");
+    const dailyChartEmpty = document.getElementById("dailyChartEmpty");
+
+    const relRange = document.getElementById("relRange");
+    const busRange = document.getElementById("busRange");
+    const heaRange = document.getElementById("heaRange");
+    const moodRange = document.getElementById("moodRange");
+    const relVal = document.getElementById("relVal");
+    const busVal = document.getElementById("busVal");
+    const heaVal = document.getElementById("heaVal");
+    const moodVal = document.getElementById("moodVal");
+
+    const wRel = document.getElementById("wRel");
+    const wBus = document.getElementById("wBus");
+    const wHea = document.getElementById("wHea");
+    const wMood = document.getElementById("wMood");
+    const wRelVal = document.getElementById("wRelVal");
+    const wBusVal = document.getElementById("wBusVal");
+    const wHeaVal = document.getElementById("wHeaVal");
+    const wMoodVal = document.getElementById("wMoodVal");
+    const weightSum = document.getElementById("weightSum");
+
+    const toLocalDateInput = (d = new Date()) => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${day}`;
+    };
+    const formatShort = (dateStr) => {
+      const d = new Date(dateStr + "T00:00:00");
+      return new Intl.DateTimeFormat("en-US", { month: "short", day: "2-digit" }).format(d);
+    };
+    const formatFull = (dateStr) => {
+      const d = new Date(dateStr + "T00:00:00");
+      return new Intl.DateTimeFormat("en-US", { month: "short", day: "2-digit", year: "numeric" }).format(d);
+    };
+
+    const loadDaily = () => {
+      try {
+        const raw = localStorage.getItem(DAILY_KEY);
+        if (raw) dailyData = JSON.parse(raw) || {};
+      } catch (e) {
+        dailyData = {};
+      }
+    };
+    const saveDaily = () => {
+      localStorage.setItem(DAILY_KEY, JSON.stringify(dailyData));
+    };
+
+    const updateRanges = () => {
+      relVal.textContent = relRange.value;
+      busVal.textContent = busRange.value;
+      heaVal.textContent = heaRange.value;
+      moodVal.textContent = moodRange.value;
+    };
+    const updateWeights = () => {
+      wRelVal.textContent = `${wRel.value}%`;
+      wBusVal.textContent = `${wBus.value}%`;
+      wHeaVal.textContent = `${wHea.value}%`;
+      wMoodVal.textContent = `${wMood.value}%`;
+      const sum = Number(wRel.value) + Number(wBus.value) + Number(wHea.value) + Number(wMood.value);
+      if (sum === 100) {
+        weightSum.textContent = "합계: 100% ✓";
+        weightSum.style.color = "var(--muted)";
+      } else {
+        weightSum.textContent = `합계: ${sum}% (100%가 아닙니다)`;
+        weightSum.style.color = "var(--danger)";
+      }
+    };
+    const calcTotal = () => {
+      const w = {
+        relationship: Number(wRel.value) / 100,
+        business: Number(wBus.value) / 100,
+        health: Number(wHea.value) / 100,
+        mood: Number(wMood.value) / 100
+      };
+      const total =
+        Number(relRange.value) * w.relationship +
+        Number(busRange.value) * w.business +
+        Number(heaRange.value) * w.health +
+        Number(moodRange.value) * w.mood;
+      dailyTotal.textContent = Math.round(total);
+      return { total: Math.round(total), weights: w };
+    };
+
+    const autoSaveIfExisting = () => {
+      const dateStr = dailyDate.value;
+      if (!dateStr || !dailyData[dateStr]) return;
+      const { total, weights } = calcTotal();
+      dailyData[dateStr] = {
+        relationship: Number(relRange.value),
+        business: Number(busRange.value),
+        health: Number(heaRange.value),
+        mood: Number(moodRange.value),
+        total,
+        weights
+      };
+      saveDaily();
+      renderDailyChart();
+      renderDailyList();
+    };
+
+    const fillFromDate = (dateStr) => {
+      const entry = dailyData[dateStr];
+      if (!entry) return;
+      relRange.value = entry.relationship;
+      busRange.value = entry.business;
+      heaRange.value = entry.health;
+      moodRange.value = entry.mood;
+      wRel.value = Math.round(entry.weights.relationship * 100);
+      wBus.value = Math.round(entry.weights.business * 100);
+      wHea.value = Math.round(entry.weights.health * 100);
+      wMood.value = Math.round(entry.weights.mood * 100);
+      updateRanges();
+      updateWeights();
+      calcTotal();
+    };
+
+    // 최근 30일 차트 데이터 구성
+    const buildChartData = () => {
+      const today = new Date();
+      const start = new Date();
+      start.setDate(today.getDate() - 29);
+      const keys = Object.keys(dailyData)
+        .filter(k => {
+          const d = new Date(k + "T00:00:00");
+          return d >= start && d <= today;
+        })
+        .sort();
+      const labels = keys.map(k => formatShort(k));
+      const data = keys.map(k => ({
+        x: formatShort(k),
+        y: dailyData[k].total,
+        meta: dailyData[k],
+        date: k
+      }));
+      return { labels, data };
+    };
+
+    // 일간 차트
+    const dailyCtx = document.getElementById("dailyChart").getContext("2d");
+    const dailyChart = new Chart(dailyCtx, {
+      type: "line",
+      data: {
+        labels: [],
+        datasets: [{
+          data: [],
+          borderColor: "#2c3e50",
+          borderWidth: 1.5,
+          tension: 0.3,
+          pointRadius: 5,
+          pointHoverRadius: 7,
+          pointBackgroundColor: "#2c3e50",
+          pointBorderWidth: 0,
+          fill: false
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 1200, easing: "easeOutQuart" },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            enabled: true,
+            backgroundColor: "rgba(0,0,0,0.8)",
+            titleColor: "#ffffff",
+            bodyColor: "#ffffff",
+            cornerRadius: 6,
+            padding: { top: 8, right: 12, bottom: 8, left: 12 },
+            titleFont: { family: "SF Pro Text, -apple-system, sans-serif", size: 12, weight: "400" },
+            bodyFont: { family: "SF Pro Text, -apple-system, sans-serif", size: 12, weight: "400" },
+            displayColors: false,
+            callbacks: {
+              title(items) {
+                const raw = items[0].raw || {};
+                return formatFull(raw.date || "");
+              },
+              label(item) {
+                const meta = item.raw.meta;
+                if (!meta) return "";
+                return [
+                  `Total: ${meta.total}`,
+                  `❤️ ${meta.relationship}  💼 ${meta.business}  🏃 ${meta.health}  😊 ${meta.mood}`
+                ];
+              }
+            }
+          }
+        },
+        interaction: { mode: "nearest", intersect: false },
+        scales: {
+          x: {
+            grid: { display: false },
+            border: { display: false },
+            ticks: {
+              color: "#86868b",
+              font: { family: "SF Mono, Monaco, monospace", size: 11, weight: "400" },
+              padding: 8
+            }
+          },
+          y: {
+            display: false,
+            min: 0,
+            max: 100,
+            grid: { display: false },
+            border: { display: false }
+          }
+        }
+      }
+    });
+
+    const renderDailyChart = () => {
+      const { labels, data } = buildChartData();
+      dailyChart.data.labels = labels;
+      dailyChart.data.datasets[0].data = data;
+      dailyChart.update("active");
+      dailyChartEmpty.style.display = data.length ? "none" : "grid";
+    };
+
+    const renderDailyList = () => {
+      dailyList.innerHTML = "";
+      const keys = Object.keys(dailyData).sort().reverse().slice(0, 7);
+      if (keys.length === 0) {
+        dailyEmpty.style.display = "block";
+        return;
+      }
+      dailyEmpty.style.display = "none";
+
+      keys.forEach(k => {
+        const entry = dailyData[k];
+        const card = document.createElement("div");
+        card.className = "daily-card";
+        card.addEventListener("click", () => {
+          dailyDate.value = k;
+          fillFromDate(k);
+        });
+
+        const title = document.createElement("div");
+        title.className = "daily-title";
+        const isToday = k === toLocalDateInput();
+        title.textContent = `${formatShort(k)}${isToday ? " (Today)" : ""}`;
+
+        const meta = document.createElement("div");
+        meta.className = "daily-meta";
+        meta.textContent = `Score: ${entry.total}`;
+
+        const subs = document.createElement("div");
+        subs.className = "daily-subs";
+        subs.textContent = `❤️ ${entry.relationship}  💼 ${entry.business}  🏃 ${entry.health}  😊 ${entry.mood}`;
+
+        const del = document.createElement("button");
+        del.className = "daily-delete";
+        del.textContent = "✕";
+        del.addEventListener("click", (e) => {
+          e.stopPropagation();
+          delete dailyData[k];
+          saveDaily();
+          renderDailyList();
+          renderDailyChart();
+        });
+
+        card.appendChild(title);
+        card.appendChild(meta);
+        card.appendChild(subs);
+        card.appendChild(del);
+        dailyList.appendChild(card);
+      });
+    };
+
+    // 입력 변화 이벤트
+    [relRange, busRange, heaRange, moodRange].forEach(el => {
+      el.addEventListener("input", () => {
+        updateRanges();
+        calcTotal();
+        autoSaveIfExisting();
+      });
+    });
+    [wRel, wBus, wHea, wMood].forEach(el => {
+      el.addEventListener("input", () => {
+        updateWeights();
+        calcTotal();
+        autoSaveIfExisting();
+      });
+    });
+
+    dailyDate.addEventListener("change", () => {
+      if (dailyData[dailyDate.value]) {
+        fillFromDate(dailyDate.value);
+      } else {
+        calcTotal();
+      }
+    });
+
+    // 저장 버튼
+    document.getElementById("saveDailyBtn").addEventListener("click", () => {
+      const dateStr = dailyDate.value || toLocalDateInput();
+      dailyDate.value = dateStr;
+
+      const { total, weights } = calcTotal();
+      dailyData[dateStr] = {
+        relationship: Number(relRange.value),
+        business: Number(busRange.value),
+        health: Number(heaRange.value),
+        mood: Number(moodRange.value),
+        total,
+        weights
+      };
+      saveDaily();
+      renderDailyChart();
+      renderDailyList();
+
+      dailySaveMsg.style.display = "block";
+      setTimeout(() => (dailySaveMsg.style.display = "none"), 1500);
+    });
+
+    // 초기 로드
+    dailyDate.value = toLocalDateInput();
+    loadDaily();
+    updateRanges();
+    updateWeights();
+    if (dailyData[dailyDate.value]) fillFromDate(dailyDate.value);
+    calcTotal();
+    renderDailyChart();
+    renderDailyList();
+  </script>
+</body>
+</html>
